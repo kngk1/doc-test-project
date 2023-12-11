@@ -1,0 +1,35 @@
+= Quick Start
+
+Apply the `com.citi.helm` plugin to your Gradle project:
+
+[source,groovy,role="primary",subs="+attributes"]
+.Groovy
+----
+plugins {
+    id 'com.citi.helm' version '{project-version}'
+}
+----
+
+[source,kotlin,role="secondary",subs="+attributes"]
+.Kotlin
+----
+plugins {
+    id("com.citi.helm") version "{project-version}"
+}
+----
+
+
+Put your Helm chart sources into `src/main/helm`:
+
+----
+📂 (project root)
+    📂 src
+        📂 main
+            📂 helm
+                📂 templates
+                    📄 ...
+                📄 Chart.yaml
+                📄 values.yaml
+----
+
+Use the `helmPackage` task to build your chart.

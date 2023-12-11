@@ -1,0 +1,214 @@
+= Configuring the Helm Client
+
+The global flags for Helm can be configured directly in the `helm` DSL block.
+
+Most of these correspond to options that are passed to every Helm CLI command as a parameter
+or an environment variable.
+
+[TIP]
+====
+As these settings can be dependent on the build environment, it is often useful to specify them in
+`gradle.properties` or on the command line instead.
+See <<Configuration from Project Properties>>.
+====
+
+
+== Global Helm Options
+
+The following properties can be set on the `helm` extension in the Gradle build script.
+
+|===
+| Property | Description | `helm` CLI option
+
+| `executable`
+| Path to the `helm` executable. The `PATH` environment variable is taken into account, so this can just be `helm`
+ (which is the default) if the Helm client is installed in a suitable location.
+|
+
+| `extraArgs`
+| Additional arguments to pass to _every_ invocation of `helm`. This can be used for command-line options that have
+ no counterpart in the plugin.
+|
+
+| `kubeConfig`
+| Path to the Kubernetes configuration file.
+| Environment variable `KUBECONFIG`
+
+| `kubeContext`
+| Name of the kubeconfig context to use.
+| `--kube-context`
+
+| `namespace`
+| Kubernetes namespace scope.
+| `--namespace`
+
+| `remoteTimeout`
+| Time to wait for any individual Kubernetes operation (like Jobs for hooks).
+| `--timeout` (on certain commands like `install`, `upgrade` or `uninstall`)
+|===
+
+[NOTE]
+====
+The environment variable `KUBECONFIG` is also honored by the plugin, but it has lower precedence than setting
+`kubeConfig` in the build script or with the `helm.kubeConfig` project property.
+
+In general, Gradle builds should avoid depending on environment variables because it makes the build less predictable
+and reproducible, and may behave unexpectedly when the Gradle daemon is used.
+====
+
+
+== Helm Directories
+
+Starting with Helm 3, Helm does not have a "helm home" directory anymore, and dropped the need for a call to
+`helm init` before working with Helm. Instead, local Helm directories are governed by 3 environment variables,
+which can be configured in the Gradle `helm` extension. By default, these directories are set to paths inside
+the Gradle project, so that any `helm` invocation from the Gradle build is independent from the Helm configuration
+present on the local machine.
+
+It is also possible to set these properties via `gradle.properties` or pass them using the `-P` flag on the
+Gradle command line (see <<Configuration from Project Properties>>).
+
+See link:https://helm.sh/docs/helm/helm/[the Helm docs] for details about how XDG base directories are used
+by the Helm CLI.
+
+|===
+| `helm` extension property | Description | Environment variable | Default Value
+
+| `xdgDataHome`
+| Base directory for storing data. (Note: this does not currently seem to be used by any `helm` command.)
+| `XDG_DATA_HOME`
+| `build/helm/data` under the project dir
+
+| `xdgConfigHome`
+| Base directory for storing configuration.
+| `XDG_CONFIG_HOME`
+| `build/helm/config` under the project dir
+
+| `xdgCacheHome`
+| Base directory for storing cached data.
+| `XDG_CACHE_HOME`
+| `.gradle/helm/cache` under the _root_ project dir
+|===
+
+[NOTE]
+====
+The cache home, as indicated by `xdgCacheHome`, defaults to a directory under the _root_ project, meaning that
+in a multi-module build, all Helm projects will share the same cache by default. This speeds up builds, but may lead
+to problems in certain situations, for example if two projects register a different chart repository under the same
+name.
++
+If necessary, you can always set the cache home to a project-local directory, for example:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    xdgCacheHome = file("${project.buildDir}/helm/cache")
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    xdgCacheHome.set(file("${project.buildDir}/helm/cache"))
+}
+----
+====
+
+
+== Automatic Download of the Helm Client
+
+As an alternative to using a locally installed Helm client, the plugin can automatically download a Helm client
+distribution from the official Helm website. This allows build scripts to be more independent from the environment
+found on the local machine where the Gradle build runs.
+
+The download can be configured either through the `helm.downloadClient` DSL block or through project properties (e.g.
+in the `gradle.properties` file). Project properties have the advantage of being automatically inherited by subprojects,
+and are easier to adapt for different build environments.
+
+
+The following example shows how the download can be configured in the build script:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    downloadClient {
+        enabled = true
+        version = '3.4.1'
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    downloadClient {
+        enabled.set(true)
+        version.set("3.4.1")
+    }
+}
+----
+
+
+The following example shows how the download can be configured using the gradle.properties file:
+
+[source,properties]
+.gradle.properties
+----
+helm.client.download.enabled=true
+helm.client.download.version=3.4.1
+----
+
+=== Using with Multi-Project Builds
+
+When using the Helm plugin in a multi-project build, the tasks to download and extract the Helm client are installed
+only once on the root project, in order to avoid multiple downloads of the same client package.
+
+While it is possible that different subprojects use different versions of Helm, some of the properties that control
+the download behavior (e.g. the URL) can only be configured globally in the root project's `gradle.properties` file.
+
+It is recommended that these settings are configured entirely by the root project `gradle.properties`, so that the
+same settings will automatically be used for all subprojects that use Helm.
+
+
+=== Helm Client Download Property Reference
+
+The following properties control the download of the Helm client:
+
+|===
+| DSL property under `helm.downloadClient` | Project property | Description | Default Value
+
+| `enabled`
+| `helm.client.download.enabled`
+| If set to `true`, the Helm client is downloaded from the remote location.
+| `false`
+
+| `version`
+| `helm.client.download.version`
+| The version of the Helm client to be downloaded.
+| The latest version of Helm available at the time the plugin is published (currently `3.4.1`)
+
+|
+| `helm.client.download.baseUrl`
+| The base URL for downloading the client executables.
+
+  You can change this to a different URL if required, for example when behind a corporate proxy.
+
+  Note that this property is considered "global" for multi-project builds, and has to be specified
+  on the root project.
+
+| `https://get.helm.sh/`
+
+|
+| `helm.client.download.osClassifier`
+| Override the OS classifier (the suffix of the downloaded filename) if auto-detection does not work as expected.
+| Auto-detected for the current system based on Java system properties.
+
+  Note that this property is considered "global" for multi-project builds, and has to be specified
+  on the root project.
+
+  For example, `darwin-amd64` or `windows-amd64`.
+|===

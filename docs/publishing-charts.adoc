@@ -1,0 +1,450 @@
+= Publishing Charts
+
+The `helm-publish` plugin allows you to publish your charts to remote repositories over HTTP.
+
+[NOTE]
+====
+There is currently no "official" API to publish Helm charts; Helm defines only how charts should be
+served from a repository. The plugin directly supports several types of popular repository servers, including
+https://chartmuseum.com/[ChartMuseum], https://jfrog.com/artifactory/[Artifactory],
+https://goharbor.io/[Harbor], https://blog.sonatype.com/nexus-as-a-container-registry[Nexus] and
+https://docs.gitlab.com/ce/user/packages/container_registry/[Gitlab].
+
+For other repository types that are not directly supported, you could try using the `custom` repository type,
+or consider creating a PR to add support for it.
+====
+
+Apply the `helm-publish` plugin to your project:
+
+[source,groovy,role="primary",subs="+attributes"]
+.Groovy
+----
+plugins {
+    id 'com.citi.helm-publish' version '{project-version}'
+}
+----
+
+[source,kotlin,role="secondary",subs="+attributes"]
+.Kotlin
+----
+plugins {
+    id("com.citi.helm-publish") version "{project-version}"
+}
+----
+
+The plugin adds another sub-extension `helm.publishing` that lets you define the repository or
+repositories to publish to:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            chartMuseum('example') {
+                url = uri('http://helm-repo.example.com/')
+            }
+            artifactory('myRepo') {
+                url = uri('http://artifactory.example.com/helm-local')
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            chartMuseum("example") {
+                url.set(uri("http://helm-repo.example.com/"))
+            }
+            artifactory("myRepo") {
+                url.set(uri("http://artifactory.example.com/helm-local"))
+            }
+        }
+    }
+}
+----
+
+This will automatically define some Gradle tasks in the project:
+
+Task `helmPublish`::
+Publishes all charts to all repositories.
+
+Task `helmPublish<X>Chart`::
+Publishes chart X to all repositories.
+
+Task `helmPublish<X>ChartTo<Y>Repo`::
+Publishes chart X to repository Y, e.g. `helmPublishMainChartToExampleRepo`.
+
+[NOTE]
+====
+There is no connection between the repositories in `helm.repositories` and
+the publishing repositories in `helm.publishing.repositories`. The former are for retrieving
+charts, the latter are for publishing them.
+
+If you want to download from and publish to
+the same external repository, you would need to specify it both in `helm.repositories` and
+`helm.publishing.repositories` (similar to Gradle's built-in publishing).
+====
+
+If you only define a single publishing repository, the name can be omitted, in which case the name `"default"` is
+used:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            artifactory {
+                url = uri('http://artifactory.example.com/helm-local')
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            artifactory {
+                url.set(uri("http://artifactory.example.com/helm-local"))
+            }
+        }
+    }
+}
+----
+
+== Repository Types
+
+The following repository types are supported:
+
+- `artifactory`
+- `chartMuseum`
+- `harbor`
+- `nexus`
+- `gitlab`
+- `custom`
+
+
+=== ChartMuseum Repositories
+
+For ChartMuseum, simply use the `chartMuseum` repository type and configure the URL:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            chartMuseum {
+                url = uri('https://chartmuseum.example.com')
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            chartMuseum {
+                url.set(uri("http://chartmuseum.example.com"))
+            }
+        }
+    }
+}
+----
+
+==== ChartMuseum Multitenancy Support
+
+ChartMuseum supports a https://chartmuseum.com/docs/#multitenancy[multitenancy] mode that lets you organize repositories
+into a hierarchy. The depth of the hierarchy is specified in the server configuration, with zero (single-tenant server)
+being the default.
+
+To publish charts to a multitenancy-enabled ChartMuseum server, add one or more tenant identifiers to the `tenantIds`
+list property in the repository configuration block. The number of tenant identifiers should match the depth configured
+on the server.
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            chartMuseum {
+                url = uri('https://chartmuseum.example.com')
+                // For a multitenancy-enabled server with depth 2, use 2 tenant IDs
+                tenantIds.addAll('org1', 'repo2')
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            chartMuseum {
+                url.set(uri("https://chartmuseum.example.com"))
+                // For a multitenancy-enabled server with depth 2, use 2 tenant IDs
+                tenantIds.addAll("org1", "repo2")
+            }
+        }
+    }
+}
+----
+
+
+=== Harbor Repositories
+
+The plugin provides direct support for Harbor repositories. The project name can be set in the
+repository configuration block, and defaults to `library` if not set:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            harbor {
+                url = uri('https://harbor.example.com')
+                projectName.set("my-project")
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            harbor {
+                url.set(uri("https://harbor.example.com"))
+                // For a multitenancy-enabled server with depth 2, use 2 tenant IDs
+                projectName.set("my-project")
+            }
+        }
+    }
+}
+----
+
+TIP: Harbor uses ChartMuseum internally for its chart repositories, and it behaves like a multi-tenant
+ChartMuseum server with two levels of depth (where the first-level tenant ID always seems to be `chartrepo`, and
+the second-level tenant ID is the project name).
+
+
+=== Nexus Repositories
+The plugin provides direct support for Nexus repositories. The repository name can be set in the
+repository configuration block, and defaults not using if not set.
+Nexus API version can be specified by property `apiVersion` default `v1` if not set.
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            nexus {
+                url = uri('http://nexus.example.com')
+                repository = 'helm-repository'
+                apiVersion = 'v1'
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            nexus {
+                url.set(uri('http://nexus.example.com'))
+                repository.set("helm-repository")
+                apiVersion.set("v1")
+            }
+        }
+    }
+}
+----
+TIP: Nexus API
+https://help.sonatype.com/repomanager3/rest-and-integration-api/components-api#ComponentsAPI-UploadComponent[documentation].
+
+=== Gitlab Repositories
+
+The plugin provides direct support for Gitlab repositories. The Gitlab API `url` and the `projectId` must be set in the
+repository configuration block.
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            gitlab {
+                url = uri('https://gitlab.example.com/api/v4')
+                projectId = 1234
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            gitlab {
+                url.set(uri("https://gitlab.example.com/api/v4"))
+                projectName.set(1234)
+            }
+        }
+    }
+}
+----
+TIP: Helm charts in the Gitlab Package Registry
+https://docs.gitlab.com/ee/user/packages/helm_repository/#helm-charts-in-the-package-registry[documentation].
+
+=== Custom Repositories
+
+If your target repository is not directly supported but involves some sort of HTTP upload, you can try the `custom`
+type which offers some (limited) possibilities to configure a freestyle upload.
+Use the `uploadMethod`, `multipartForm` and/or `uploadPath` properties to customize the upload request:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            custom {
+                url = uri('http://helm-repo.example.com')
+                uploadMethod = 'PUT'
+                multipartForm = true
+                uploadPath = '/charts/{name}/{version}/{filename}'
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            custom {
+                url.set(uri("http://helm-repo.example.com"))
+                uploadMethod.set("PUT")
+                multipartForm.set(true)
+                uploadPath.set("/charts/{name}/{version}/{filename}")
+            }
+        }
+    }
+}
+----
+
+The following placeholders can be used in the `uploadPath` property:
+
+- `{name}` will be replaced with the chart name
+- `{version}` will be replaced with the chart version
+- `{filename}` will be replaced with the file name of the packaged chart, i.e. `{name}-{version}.tgz`
+
+
+
+== Specifying Credentials for Repositories
+
+Most likely, a chart repository will require some credentials for write access. You can configure
+credentials in the same way as for `repositories`:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm {
+    publishing {
+        repositories {
+            example {
+                url = uri('http://helm-repo.example.com/')
+                credentials {
+                    username = 'user'
+                    password = 'password'
+                }
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm {
+    publishing {
+        repositories {
+            create("example") {
+                url.set(uri("http://helm-repo.example.com/"))
+            }
+            credentials {
+                username.set("user")
+                password.set("password")
+            }
+        }
+    }
+}
+----
+
+
+
+
+== Preventing a Chart from Being Published
+
+By default, all charts defined in the project will be published. You can prevent this for a specific
+chart by setting its `publish` property to `false`:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm.charts {
+
+    // This chart will not be published
+    unpublishedChart {
+        // ...
+        publish = false
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm.charts {
+
+    // This chart will not be published
+    create("unpublishedChart") {
+        // ...
+        publish = false
+    }
+}
+----

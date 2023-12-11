@@ -1,0 +1,242 @@
+= Defining Charts
+
+With the `helm` plugin you can configure your Helm chart using a declarative DSL, and the corresponding Gradle
+tasks will be added automatically.
+
+Groovy
+[source,groovy,subs="+attributes",role="primary"]
+----
+plugins {
+    id 'com.citi.helm' version '{project-version}'
+}
+
+helm {
+    charts {
+        foo {
+            chartName = 'foo'
+            chartVersion = '1.2.3'
+            sourceDir = file('src/helm')
+        }
+    }
+}
+----
+
+Kotlin
+[source,kotlin,subs="+attributes",role="secondary"]
+----
+plugins {
+    id("com.citi.helm") version "{project-version}"
+}
+
+helm {
+    charts {
+        create("foo") {
+            chartName.set("foo")
+            chartVersion.set("1.2.3")
+            sourceDir.set(file("src/helm"))
+        }
+    }
+}
+----
+
+Note that the chart moniker used in the DSL and the actual chart name are not necessarily the same, unless you set
+ them to the same value.
+
+
+The following properties can be configured on a chart:
+
+|===
+| Property | Description | Default
+
+| `chartName`
+| The name of the chart, as used in various `helm` CLI commands. The plugin will make sure that the chart sources are
+  in a directory with this name when calling `helm`.
+| Defaults to the name of the chart in the DSL.
+
+| `chartVersion`
+| The version of the chart, as used by `helm`.
+| Defaults to the Gradle project version.
+
+| `sourceDir`
+| The directory containing the chart sources (`Chart.yaml` file, etc.).
+| Defaults to `src/main/helm` for the `main` chart (see below), _required_ for all other charts.
+
+| `extraFiles`
+| An optional Gradle `CopySpec` that allows injecting files from external sources into the chart.
+| By default, no files are copied.
+|===
+
+
+== Helm Chart Tasks
+
+From the above chart definition, a number of tasks will be created automatically:
+
+Task `helmFilterFooChartSources`::
+Resolves placeholders in the chart sources.
+
+Task `helmCollectFooChartDependencies`::
+Resolves chart dependencies within the project (see <<Managing Chart Dependencies>>).
+
+Task `helmCollectFooChartSources`::
+Collects all the sources for a chart (including dependencies and extra files) into one directory.
+
+Task `helmUpdateFooChartDependencies`::
+Equivalent to the link:https://helm.sh/docs/helm/helm_dependency_update/[`helm dependency update`] CLI command.
+
+Task `helmLintFooChart`::
+Equivalent to the link:https://helm.sh/docs/helm/helm_lint/[`helm lint`] CLI command. See <<Linting Charts>> for
+details on configuring the linting step.
+
+Task `helmPackageFooChart`::
+Equivalent to the link:https://helm.sh/docs/helm/helm_package/[`helm package`] CLI command.
+
+
+In addition, the plugin creates a task named `helmPackage` that will depend on all charts' package task, so it can be
+used to build all the project's charts. Most of the time, you will just call `helmPackage` to build your charts.
+
+
+== Helm Chart Configurations
+
+The following configurations and artifacts will be created for each chart:
+
+Configuration `helmFoo`::
+Contains a single artifact that has the chart directory as its output, and is built by the
+`helmBuildFooChartDependencies` task.
+
+Configuration `helmFooPackaged`::
+Contains a single artifact that has the packaged (tar.gz) chart file as its output, and is built by the
+`helmPackageFooChart` task.
+
+
+== Using the `main` chart
+
+For the typical case of building a single Helm chart in a project, the Helm plugin provides some useful conventions
+so that a single "main" chart can be built with a minimum of configuration.
+
+If you don't define any charts in the `helm.charts` DSL block, and your project contains a file
+`src/main/helm/Chart.yaml`, then by convention a chart named `main` will be
+defined automatically, equivalent to the following:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm.charts {
+    main {
+        sourceDir = file('src/main/helm')
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm.charts {
+    create("main") {
+        sourceDir.set(file("src/main/helm"))
+    }
+}
+----
+
+WARNING: since Helm chart versions must be SemVer-compliant, you should either make sure that the project version is a
+valid SemVer, or set the main chart version to a different value.
+
+The `main` chart will not be instantiated if you define any other charts; however you can create the `main` chart
+explicitly if you would like to use it anyway:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm.charts.main.chartVersion = '1.0.0'
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm.charts.create("main") {
+    chartVersion.set("1.0.0")
+}
+----
+
+[TIP]
+====
+Some IDEs (e.g. IntelliJ IDEA) offer support for Helm, and will report a warning or error if the `name` declared in
+the Chart.yaml file differs from the name of the containing directory. If you want to avoid such a warning, you can
+either
+  * call your chart `helm` in the Chart.yaml file -- it will automatically be renamed when the chart is packaged; or
+  * change the `sourceDir` of the `main` chart to a directory that matches the chart name.
+====
+
+
+== Using Charts in a Multi-Project Build
+
+Of course, instead of defining multiple charts in one Gradle project, you can also have a multi-project build where
+each subproject defines a single `main` chart. That way, you can take advantage of the `main` chart convention in
+every project.
+
+However, note that the values defined in the `helm` block are not automatically inherited by subprojects.
+If you want to define your Helm CLI options in one central place, you can add a `subprojects` clause in the root
+project:
+
+[source,groovy,role="primary"]
+.Groovy
+----
+subprojects {
+    // Use verbose logging on all Helm commands
+    helm.extraArgs.addAll("-v", "1")
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+subprojects {
+    // Use verbose logging on all Helm commands
+    helm.extraArgs.addAll("-v", "1")
+}
+----
+
+
+== Adding Extra Files to a Chart
+
+Each chart defined in the DSL has an `extraFiles` property which is a Gradle `CopySpec`. It allows you to copy
+additional files into the chart when it is built.
+
+[source,groovy,role="primary"]
+.Groovy
+----
+helm.charts {
+    myChart {
+        sourceDir = file 'src/helm/my-chart'
+
+        extraFiles {
+            from('src/extra/script.js') {
+                into('files/scripts')
+            }
+        }
+    }
+}
+----
+
+[source,kotlin,role="secondary"]
+.Kotlin
+----
+helm.charts {
+    create("myChart") {
+        sourceDir.set(file("src/helm/my-chart"))
+
+        extraFiles {
+            from("src/extra/script.js") {
+                into("files/scripts")
+            }
+        }
+    }
+}
+----
+
+In most cases, the source files of the chart should be put into the chart source directory.
+The `extraFiles` mechanism is primarily designed for cases where some parts of the chart need to be dynamically
+generated during the Gradle build.
+
+TIP: If the `extraFiles` copy spec refers to a `RegularFileProperty` or `DirectoryProperty` that represents the output
+of a task, or to an artifact declared by another project, a task dependency will automatically be set up so that the
+task building the file is run before the Helm chart is built.
