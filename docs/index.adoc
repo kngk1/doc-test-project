@@ -4,9 +4,11 @@
 :toc: left
 :icons: font
 :sectanchors:
+:page-interpolate: true
 
 This is a suite of plugins for packaging and publishing Helm Charts from Gradle, and managing Helm releases
 on a Kubernetes cluster.
+This website was generated on #{Time.now.strftime('%a %-d %B %Y at %H:%M:%S %Z')}.
 
 include::prerequisites.adoc[leveloffset=1]
 
