@@ -13,20 +13,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install Asciidoctor
-        run: |
-          sudo apt-get update
-          sudo apt-get install asciidoctor
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
 
-      - name: Generate HTML from AsciiDoc
-        run: |
-          asciidoctor -D generateddocs ./docs/index.adoc
+      - name: Run build with Gradle Wrapper
+        run: ./gradlew :asciidoctor
 
       - name: Deploy Docs to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
-          publish_dir: generateddocs
+          publish_dir: build/docs/asciidoc
           destination_dir: projects/doc-test-project
           external_repository: kngk1/kngk1.github.io
           publish_branch: main

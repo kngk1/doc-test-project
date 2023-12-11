@@ -4,3 +4,40 @@
  * This is a general purpose Gradle build.
  * Learn more about Gradle by exploring our samples at https://docs.gradle.org/8.1.1/samples
  */
+plugins {
+    id("org.asciidoctor.jvm.convert") version "3.3.2"
+}
+
+repositories {
+    mavenCentral()
+}
+
+val asciidoctorExt: Configuration by configurations.creating
+
+dependencies {
+    asciidoctorExt("com.bmuschko:asciidoctorj-tabbed-code-extension:0.3")
+}
+
+
+tasks.named("asciidoctor", org.asciidoctor.gradle.jvm.AsciidoctorTask::class) {
+
+    sourceDir("docs")
+    baseDirFollowsSourceDir()
+    sources {
+        include("index.adoc")
+    }
+
+    configurations(asciidoctorExt.name)
+
+    options(
+        mapOf(
+            "doctype" to "book"
+        )
+    )
+    attributes(
+        mapOf(
+            "project-version" to project.version,
+            "source-highlighter" to "prettify"
+        )
+    )
+}
