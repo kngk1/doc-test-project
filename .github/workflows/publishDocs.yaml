@@ -20,7 +20,7 @@ jobs:
 
       - name: Generate HTML from AsciiDoc
         run: |
-          asciidoctor -D generateddocs -R docs
+          asciidoctor -D generateddocs ./docs/*.adoc
 
       - name: Deploy Docs to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
