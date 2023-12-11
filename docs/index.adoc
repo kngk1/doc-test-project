@@ -4,9 +4,6 @@
 :toc: left
 :icons: font
 :sectanchors:
-:mydateformat: %Y-%m-%d %H:%M:%S %Z
-
-Generated on {docdate, format=mydateformat}
 
 This is a suite of plugins for packaging and publishing Helm Charts from Gradle, and managing Helm releases
 on a Kubernetes cluster.
