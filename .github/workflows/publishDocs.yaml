@@ -28,5 +28,5 @@ jobs:
           deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
           publish_dir: generateddocs
           destination_dir: projects/doc-test-project
-          external_repository: knkg1/kngk1.github.io
+          external_repository: kngk1/kngk1.github.io
           publish_branch: main
